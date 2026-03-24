@@ -17,7 +17,6 @@ A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`g
   - [ADK dev UI (optional)](#adk-dev-ui-optional)
 - [Free-tier Gemini notes](#free-tier-gemini-notes)
 - [Scaling to 50 podcasts (assignment answer)](#scaling-to-50-podcasts-assignment-answer)
-- [Deliverables](#deliverables)
 
 ---
 
@@ -204,10 +203,3 @@ At 50 shows a single monolithic loop is slow and brittle. The architecture gener
 
 **Observability:** Structured logs per agent with `correlation_id` (already in this codebase) so you can trace exactly which podcast failed and why.
 
----
-
-## Deliverables
-
-1. **Code** — this repository
-2. **`intelligence_briefing.md`** — from `python run_briefing.py` (with API key), or `build_sample_briefing.py` for a tools-only sample
-3. **Scaling answer** — section above
