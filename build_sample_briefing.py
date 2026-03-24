@@ -14,7 +14,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import podcast_intel_agent.env_bootstrap  # noqa: F401
-from podcast_intel_agent.config import BUILD_SAMPLE_TRANSCRIBE_SECONDS, FEED_URLS
+from podcast_intel_agent.config import (
+    BUILD_SAMPLE_TRANSCRIBE_SECONDS,
+    FEED_URLS,
+    resolved_briefing_output_path,
+)
 from podcast_intel_agent.date_format import format_published_for_briefing
 from podcast_intel_agent.pipeline import gather_briefing_data
 
@@ -31,7 +35,7 @@ def _two_bullets(text: str) -> tuple[str, str]:
 
 
 def main() -> None:
-    out = Path(__file__).resolve().parent / "intelligence_briefing.md"
+    out = resolved_briefing_output_path()
     data = gather_briefing_data(FEED_URLS, max_transcribe_seconds=BUILD_SAMPLE_TRANSCRIBE_SECONDS)
     if data.get("status") != "ok":
         sys.exit(f"Ingest failed: {data}")

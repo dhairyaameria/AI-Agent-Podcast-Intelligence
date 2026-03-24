@@ -4,3 +4,4 @@ openai-whisper>=20231117
 torch>=2.0.0
 python-dotenv>=1.0.0
 openai>=1.40.0
+nest-asyncio>=1.6.0

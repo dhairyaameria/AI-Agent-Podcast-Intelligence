@@ -1,6 +1,6 @@
 # Podcast Intelligence Agent · Google ADK
 
-A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`google-adk`) that ingests **three RSS feeds in parallel**, transcribes the first ~5 minutes of each latest episode with Whisper (ffmpeg stream-crop — no full download), and produces a structured Markdown intelligence briefing via **Gemini**, **Groq**, or **OpenAI**.
+A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`google-adk`) that ingests **three RSS feeds in parallel**, transcribes the first ~5 minutes of each latest episode with Whisper (**ffmpeg** applies **`-t` before `-i`** so the HTTP input stops after ~N seconds of media — not a full-episode download), and produces a structured Markdown intelligence briefing via **Gemini**, **Groq**, or **OpenAI**.
 
 **Default feeds:** Dwarkesh Podcast · Acquired · Darknet Diaries (override with `PODCAST_RSS_URLS`)
 
@@ -55,7 +55,7 @@ Root orchestrator
 | `podcast_intel_agent/config.py` | All tunables — no duplicate defaults in Python. |
 | `podcast_intel_agent/synthesis_prompt.py` | Shared `SYNTHESIS_INSTRUCTION` for Gemini ADK and OpenAI-compatible APIs. |
 | `podcast_intel_agent/compat_synthesis.py` | **`synthesize_briefing_openai_compat`** — one Chat Completions call for `SYNTHESIS_BACKEND=groq` or `openai`. |
-| `run_briefing.py` | Pipeline → ≥ 2/3 gate → synthesis. `ADK_TOOLS_ONLY=1` always uses Gemini `root_agent`. |
+| `run_briefing.py` | Pipeline → ≥ 2/3 gate → one synthesis call. `ADK_TOOLS_ONLY=1` forces Gemini (same path; use **`adk web` / `adk run`** for `root_agent` with tools). |
 | `build_sample_briefing.py` | Same ingest/transcription path with no LLM — writes `intelligence_briefing.md` for demos/CI. |
 
 **Artifacts:** `intelligence_briefing.md` (output) · `.checkpoints/` (transcript cache) · `dead_letter.jsonl` (hard failures after retries)
@@ -79,7 +79,7 @@ Root orchestrator
 
 | Technique | Why | Where |
 |---|---|---|
-| **Intro-only crop (`ffmpeg -t`)** | Full episodes are slow and expensive — only the first N seconds are decoded/transcribed | `transcribe_intro_snippet`, `TRANSCRIBE_MAX_SECONDS` |
+| **Intro-only crop (`-t` before `-i`)** | Limits **input** duration so the network read stops after ~N seconds of audio; then decode/transcribe that clip only | `transcribe_intro_snippet`, `TRANSCRIBE_MAX_SECONDS` |
 | **Smaller Whisper tier** | `base` or `tiny` prioritises speed and footprint for this use case | `config.py`, `WHISPER_MODEL` |
 | **Checkpointing** | Retries or partial failures don't redo successful ASR | `.checkpoints/`, `_checkpoint_file` |
 | **Per-feed isolation + retries** | One bad feed doesn't kill the others; jitter avoids hammering flaky hosts | `ingest_latest_episodes`, `resilience.retry_sync` |
@@ -126,7 +126,9 @@ All tunables are in `.env.example` as real assignments. Notable keys:
 | `LLM_MIN_INTERVAL_SEC` | Minimum gap before LLM call |
 | `LLM_TOKEN_BUCKET_CAPACITY` | Token bucket size for LLM throttle |
 | `PODCAST_RSS_RETRIES` | Per-feed retry attempts |
+| `PODCAST_RSS_RETRY_BASE_DELAY_SEC` | First backoff delay for RSS retries (seconds; podcast CDNs often need longer gaps) |
 | `PODCAST_TRANSCRIBE_RETRIES` | Per-transcription retry attempts |
+| `BRIEFING_OUTPUT_PATH` | Markdown output path (relative to project root unless absolute) |
 
 If the app raises `Missing … in .env`, add that variable from `.env.example`.
 
@@ -178,6 +180,8 @@ At 50 shows a single monolithic loop is slow and brittle. The architecture gener
 **Agent topology:** 1 root orchestrator fans out to N podcast agents (ADK `ParallelAgent`). Each agent is isolated — one failure doesn't affect others.
 
 **Transcription compute:** Move Whisper off the main process into a Celery worker pool (backed by Redis). Each transcription job is a queued task — scale horizontally by adding workers or using Cloud Run Jobs. Always crop with ffmpeg before decode (as in this project).
+
+**Pipelining:** `gather_briefing_data` runs RSS ingest (parallel) then transcription (parallel) as **two sequential phases**. For three feeds the cost is negligible; at **N ≫ 3** you would pipeline (start transcribing episode 1 while others still ingest) via a queue or async producer–consumer pattern.
 
 **LLM throughput:** Token bucket + queue at the synthesis boundary. Batch episodes where the API allows. Exponential backoff + jitter on 429/5xx. Model tiering: small model for per-episode summaries, larger model once for cross-show analysis.
 

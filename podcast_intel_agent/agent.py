@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,7 @@ from google.adk.agents import LlmAgent
 from podcast_intel_agent.config import (
     GEMINI_MODEL,
     PODCAST_RSS_RETRIES,
+    PODCAST_RSS_RETRY_BASE_DELAY_SEC,
     PODCAST_TRANSCRIBE_RETRIES,
     WHISPER_MODEL,
     resolved_checkpoint_dir,
@@ -29,7 +31,21 @@ from podcast_intel_agent.config import (
 from podcast_intel_agent.resilience import retry_sync
 from podcast_intel_agent.synthesis_prompt import SYNTHESIS_INSTRUCTION
 
+_WHISPER_LOCK = threading.Lock()
 _WHISPER_MODEL = None
+_WHISPER_MODEL_NAME: str | None = None
+
+
+def _get_whisper_model(model_name: str):
+    """Load Whisper once; thread-safe for parallel transcribers."""
+    global _WHISPER_MODEL, _WHISPER_MODEL_NAME
+    with _WHISPER_LOCK:
+        if _WHISPER_MODEL is None or _WHISPER_MODEL_NAME != model_name:
+            import whisper  # lazy: heavy import
+
+            _WHISPER_MODEL = whisper.load_model(model_name)
+            _WHISPER_MODEL_NAME = model_name
+        return _WHISPER_MODEL
 
 
 def _project_root() -> Path:
@@ -114,7 +130,7 @@ def _ingest_single_feed(url: str) -> dict[str, Any]:
     def attempt() -> dict[str, Any]:
         parsed = feedparser.parse(
             url,
-            agent="PodcastIntelAgent/1.0 (+https://github.com/google/adk)",
+            agent="PodcastIntelAgent/1.0 (+https://github.com/dhairyaameria/AI-Agent-Podcast-Intelligence)",
         )
         if parsed.bozo and not parsed.entries:
             bozo = getattr(parsed, "bozo_exception", "unknown")
@@ -123,14 +139,18 @@ def _ingest_single_feed(url: str) -> dict[str, Any]:
         if not entries:
             raise RuntimeError("No entries in feed.")
 
-        def sort_key(e: feedparser.FeedParserDict) -> tuple:
-            t = e.get("published_parsed") or e.get("updated_parsed")
-            if t:
-                return (0, t)
-            return (1, "")
-
-        entries.sort(key=sort_key)
-        latest = entries[-1]
+        dated = [
+            e
+            for e in entries
+            if e.get("published_parsed") or e.get("updated_parsed")
+        ]
+        if dated:
+            latest = max(
+                dated,
+                key=lambda e: e.get("published_parsed") or e.get("updated_parsed"),
+            )
+        else:
+            latest = entries[-1]
         audio = _audio_url_from_entry(latest)
         item: dict[str, Any] = {
             "feed_url": url,
@@ -145,7 +165,11 @@ def _ingest_single_feed(url: str) -> dict[str, Any]:
         return item
 
     try:
-        return retry_sync(attempt, max_attempts=_rss_retries())
+        return retry_sync(
+            attempt,
+            max_attempts=_rss_retries(),
+            base_delay=PODCAST_RSS_RETRY_BASE_DELAY_SEC,
+        )
     except Exception as exc:  # noqa: BLE001
         _dead_letter_append({"phase": "rss", "feed_url": url, "error": str(exc)})
         return {"feed_url": url, "error": str(exc)}
@@ -188,7 +212,6 @@ def _transcribe_intro_impl(audio_url: str, max_seconds: int) -> dict[str, Any]:
         return {"status": "error", "error": "audio_url must be a non-empty string."}
     cap = max(60, min(int(max_seconds), 600))
 
-    global _WHISPER_MODEL  # noqa: PLW0603
     tmp_dir = tempfile.mkdtemp(prefix="podcast_intel_")
     try:
         out_wav = os.path.join(tmp_dir, "clip.wav")
@@ -196,6 +219,7 @@ def _transcribe_intro_impl(audio_url: str, max_seconds: int) -> dict[str, Any]:
         if not ffmpeg:
             return {"status": "error", "error": "ffmpeg not found on PATH; install ffmpeg."}
 
+        # -t before -i: input duration limit so HTTP read stops after ~cap seconds of media.
         cmd = [
             ffmpeg,
             "-hide_banner",
@@ -203,11 +227,11 @@ def _transcribe_intro_impl(audio_url: str, max_seconds: int) -> dict[str, Any]:
             "error",
             "-user_agent",
             "PodcastIntelAgent/1.0",
-            "-y",
-            "-i",
-            audio_url,
             "-t",
             str(cap),
+            "-i",
+            audio_url,
+            "-y",
             "-ar",
             "16000",
             "-ac",
@@ -216,13 +240,9 @@ def _transcribe_intro_impl(audio_url: str, max_seconds: int) -> dict[str, Any]:
         ]
         subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=300)
 
-        import whisper  # lazy: heavy import
-
         model_name = WHISPER_MODEL
-        if _WHISPER_MODEL is None or getattr(_WHISPER_MODEL, "name", None) != model_name:
-            _WHISPER_MODEL = whisper.load_model(model_name)
-
-        result = _WHISPER_MODEL.transcribe(out_wav, fp16=False)
+        wmodel = _get_whisper_model(model_name)
+        result = wmodel.transcribe(out_wav, fp16=False)
         text = (result.get("text") or "").strip()
         return {
             "status": "ok",
@@ -248,7 +268,7 @@ def _checkpoint_file(audio_url: str, cap: int) -> Path:
 
 
 def transcribe_intro_snippet(audio_url: str, max_seconds: int = 300) -> dict[str, Any]:
-    """Download audio, keep only the first max_seconds via ffmpeg, transcribe with Whisper tiny/base.
+    """Stream the first max_seconds of audio (ffmpeg input duration limit), transcribe with Whisper tiny/base.
 
     Uses checkpoint files and exponential-backoff retries; failures append to dead_letter.jsonl.
 

@@ -32,6 +32,10 @@ def _int_env(key: str) -> int:
     return int(_req(key))
 
 
+def _float_env(key: str) -> float:
+    return float(_req(key))
+
+
 # --- Models & transcription ---
 GEMINI_MODEL = _req("GEMINI_MODEL")
 WHISPER_MODEL = _req("WHISPER_MODEL").lower()
@@ -60,10 +64,12 @@ if SYNTHESIS_BACKEND not in ("gemini", "groq", "openai"):
     raise RuntimeError("SYNTHESIS_BACKEND must be gemini, groq, or openai")
 
 PODCAST_RSS_RETRIES = max(1, _int_env("PODCAST_RSS_RETRIES"))
+PODCAST_RSS_RETRY_BASE_DELAY_SEC = max(0.5, min(_float_env("PODCAST_RSS_RETRY_BASE_DELAY_SEC"), 120.0))
 PODCAST_TRANSCRIBE_RETRIES = max(1, _int_env("PODCAST_TRANSCRIBE_RETRIES"))
 
 CHECKPOINT_DIR = _req("CHECKPOINT_DIR")
 DEAD_LETTER_PATH = _req("DEAD_LETTER_PATH")
+BRIEFING_OUTPUT_PATH = _req("BRIEFING_OUTPUT_PATH")
 
 LLM_MIN_INTERVAL_SEC = float(_req("LLM_MIN_INTERVAL_SEC"))
 _refill = _opt("LLM_TOKEN_BUCKET_REFILL_PER_SEC")
@@ -89,6 +95,13 @@ def resolved_checkpoint_dir() -> Path:
 
 def resolved_dead_letter_path() -> Path:
     p = Path(DEAD_LETTER_PATH)
+    if not p.is_absolute():
+        p = _PROJECT_ROOT / p
+    return p
+
+
+def resolved_briefing_output_path() -> Path:
+    p = Path(BRIEFING_OUTPUT_PATH)
     if not p.is_absolute():
         p = _PROJECT_ROOT / p
     return p

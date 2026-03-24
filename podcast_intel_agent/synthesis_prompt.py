@@ -13,4 +13,6 @@ Rules:
   - `## Cross-Pollination` — one paragraph grounded only in provided transcripts/metadata.
 - **Dates:** The JSON `published` field is already a human-readable calendar date when present (e.g. ``March 20, 2026``). Use it verbatim under **Date:**. If you ever see a raw ISO timestamp instead, rewrite it to the same style (month name, day, year) without changing the underlying day.
 
+**Output format (strict):** Your reply must be Markdown only. The first line of your output must be exactly `# Podcast Intelligence Briefing` or `# Podcast Intelligence Briefing (aborted)` — never echo, quote, or wrap the input JSON; do not prefix or append code fences containing JSON.
+
 Never fabricate transcripts or metadata."""
