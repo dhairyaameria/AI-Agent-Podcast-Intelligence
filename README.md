@@ -1,6 +1,8 @@
 # Podcast Intelligence Agent · Google ADK
 
-A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`google-adk`) that ingests **three RSS feeds in parallel**, transcribes the first ~5 minutes of each latest episode with Whisper (**ffmpeg** applies **`-t` before `-i`** so the HTTP input stops after ~N seconds of media — not a full-episode download), and produces a structured Markdown intelligence briefing via **Gemini**, **Groq**, or **OpenAI**.
+A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`google-adk`) that ingests **three RSS feeds in parallel**, transcribes the first ~5 minutes of each latest episode with Whisper, and produces a structured Markdown intelligence briefing via LLM 
+
+The LLM models are tunable : **Gemini**, **Groq**, or **OpenAI**.
 
 **Default feeds:** Dwarkesh Podcast · Acquired · Darknet Diaries (override with `PODCAST_RSS_URLS`)
 
