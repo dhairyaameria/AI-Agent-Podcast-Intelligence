@@ -6,7 +6,7 @@ A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`g
 
 ---
 
-## How it works — end-to-end flow
+## How it works (end-to-end flow)
 
 ```
 Scheduled trigger (cron / Cloud Scheduler)
