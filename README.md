@@ -23,40 +23,7 @@ The LLM models are tunable : **Gemini**, **Groq**, or **OpenAI**.
 ---
 
 ## How it works (end-to-end flow)
-
-```
-Scheduled trigger (cron / Cloud Scheduler)
-        │
-        ▼
-Root orchestrator
-        │
-        ├── Podcast agent 1 ──┐
-        ├── Podcast agent 2 ──┼── parallel RSS ingest + retry ×3
-        └── Podcast agent 3 ──┘
-                │
-                ▼
-        Transcription workers (ThreadPoolExecutor)
-        ffmpeg stream-crop → Whisper (base/tiny)
-                │
-                ▼
-        Checkpoint store (.checkpoints/)
-        Skip re-transcription on re-run
-                │
-                ▼
-        ≥ 2/3 gate (ORCHESTRATOR_MIN_SUCCESS)
-        Abort if too few succeeded
-                │
-                ▼
-        Rate limit manager
-        Token bucket + LLM_MIN_INTERVAL_SEC
-                │
-                ▼
-        Synthesis agent (Gemini / Groq / OpenAI)
-        One structured LLM call
-                │
-                ▼
-        intelligence_briefing.md
-```
+<img width="2098" height="2898" alt="image" src="https://github.com/user-attachments/assets/6023a1d1-00a7-484c-80ec-9c7a8eb396f7" />
 
 ---
 
