@@ -23,7 +23,7 @@ The LLM models are tunable : **Gemini**, **Groq**, or **OpenAI**.
 ---
 
 ## How it works (end-to-end flow)
-<img width="2098" height="2898" alt="image" src="https://github.com/user-attachments/assets/6023a1d1-00a7-484c-80ec-9c7a8eb396f7" />
+<img width="770" height="841" alt="image" src="https://github.com/user-attachments/assets/acdfb8f0-7f93-4492-be1c-d7dc61691cef" />
 
 ---
 
