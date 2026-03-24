@@ -4,6 +4,21 @@ A code-first AI agent using [Google ADK](https://google.github.io/adk-docs/) (`g
 
 **Default feeds:** Dwarkesh Podcast · Acquired · Darknet Diaries (override with `PODCAST_RSS_URLS`)
 
+## Contents
+
+- [How it works (end-to-end flow)](#how-it-works-end-to-end-flow)
+- [Architecture](#architecture)
+- [Fault tolerance](#fault-tolerance)
+- [Resource efficiency techniques](#resource-efficiency-techniques)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Run](#run)
+  - [No LLM (tools-only sample)](#no-llm-tools-only-sample)
+  - [ADK dev UI (optional)](#adk-dev-ui-optional)
+- [Free-tier Gemini notes](#free-tier-gemini-notes)
+- [Scaling to 50 podcasts (assignment answer)](#scaling-to-50-podcasts-assignment-answer)
+- [Deliverables](#deliverables)
+
 ---
 
 ## How it works (end-to-end flow)
